@@ -1,11 +1,23 @@
 <!DOCTYPE html>
 <html>
   <head>
-		<title></title>
 		<meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/> 
+    <title>Atlas game client</title>
 		<link rel="stylesheet" type="text/css" media="screen" href="style/common.css">
-		<script data-main="js/router" src="js/lib/require-2.1.1-min.js"></script>
+    <script src="conf.js"></script>
+		<script data-main="js/Router" src="js/lib/require-2.1.1-min.js"></script>
   </head>
   <body>
+    <div id="main"></div>
+    <!-- Login form must be inside DOM since the start to allow password auto completion -->
+    <div id="login-stock" style="display:none">
+      <form id="login-form" method="post">
+        <input autofocus="autofocus" type="text" name="username"/>
+        <input autocomplete="on" type="password" name="password"/>
+        <input type="submit" style="width:0; height:0; border:0; padding:0"/>
+      </form>
+      <a href="#" data-state="disabled" class="login"></a>
+    </div>
   </body>
 </html>

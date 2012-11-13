@@ -1,0 +1,111 @@
+// cross-browser compatibility
+transition(args...)
+  -wekbit-transition args
+  -moz-transition args
+  transition args
+
+transform(args...)
+  -webkit-transform args
+  -moz-transform args
+  transform args
+
+perspective(args...)
+  -webkit-perspective args
+  -moz-perspective args
+  perspective args
+
+box-sizing(args...)
+  -webkit-box-sizing args
+  -moz-box-sizing args
+  box-sizing args
+
+// Flexible box model compatibility
+display(value)
+  if value == box
+    display -webkit-box
+    display -moz-box
+    display box
+  else if value == inline-box
+    display -webkit-inline-box
+    display -moz-inline-box
+    display inline-box
+  else
+    display value
+
+box-flex(args...)
+  -webkit-box-flex args
+  -moz-box-flex args
+  box-flex args
+
+box-ordinal-group(args...)
+  -webkit-box-ordinal-group args
+  -moz-box-ordinal-group args
+  box-ordinal-group args
+
+box-pack(args...)
+  -webkit-box-pack args
+  -moz-box-pack args
+  box-pack args
+
+box-direction(args...)
+  -webkit-box-direction args
+  -moz-box-direction args
+  box-direction args
+
+box-align(args...)
+  -webkit-box-align args
+  -moz-box-align args
+  box-align args
+
+box-orient(args...)
+  -webkit-box-orient args
+  -moz-box-orient args
+  box-orient args
+
+// Specify inactive state to the current selector (text sriked and inactive font color)
+inactive()
+  color inactiveColor
+  text-decoration line-through
+
+// Specify hover behaviour to the current selector (background change with transition and cursor)
+hoverable()
+  cursor pointer
+  transition all 250ms
+
+  &:hover
+    background-color hoverColor
+
+// Style for connect buttons: images/login.png. 3 states supported: normal, hover and active
+//
+// @param selector [String] selector on which apply connect button styles
+// @param line [Number] line in the image. (75px height, divided by 3)
+connect-button(selector, line)
+  // normal: from 0 to -25
+  {selector}
+    display inline-block
+    box-sizing border-box
+    height 25px
+    padding-left 35px
+    background-image url('images/login.png')
+    background-position 0px unit(-75*line, 'px')
+    line-height 25px
+
+  {selector}:after
+    content ''
+    float right
+    background-image url('images/login.png')
+    background-position right unit(-75*line, 'px')
+    height 25px
+    width 15px
+
+  // hover: from -25 to -50
+  {selector}:hover
+    background-position 0px unit((-75*(line+1))+50, 'px')
+  {selector}:hover:after
+    background-position right unit((-75*(line+1))+50, 'px')
+
+  // active: from -50 to -75
+  {selector}:active
+    background-position 0px unit((-75*(line+1))+25, 'px')
+  {selector}:active:after
+    background-position right unit((-75*(line+1))+25, 'px')
