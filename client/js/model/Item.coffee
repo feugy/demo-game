@@ -1,5 +1,3 @@
-'use strict'
-
 define [
   'utils/common'
   'model/BaseModel'
@@ -19,28 +17,28 @@ define [
     # **private**
     # List of not upadated attributes
     _notUpdated: ['_id', 'type', 'map']
-
-    # Enhance Backone method to allow existing models to be re-added.
-    # Needed because map will add retrieved items when content returned from server, and `add` event needs
-    # to be fired from collection
-    add: (added, options) =>
-      added = [added] unless Array.isArray added
-
-      previous = []
-      # silentely removes existing models to allow map to be updated
-      for obj in added
-        existing = @get obj._id
-        continue unless existing?
-        @remove existing, silent: true
-        previous.push existing
-        
-      super added, options
-
-      # trigger re-addition for Item views
-      for existing in previous
-        @trigger 'readd', existing, @get existing.id
-
-
+    
+    # enhanced inheritted method to trigger `add` event on existing models that
+    # are added a second time.
+    #
+    # @param models [Object/Array] added model(s)
+    # @param options [Object] addition options
+    add: (models, options) =>
+      existings = []
+      
+      models = if Array.isArray models then models else [models]
+      # keep existing models that will be merged
+      existings.push @_byId[model._id] for model in models when @_byId?[model._id]?
+      
+      options = {} unless options?
+      options.merge = true
+      
+      # superclass behaviour
+      super models, options
+      
+      # trigger existing model re-addition
+      model.trigger 'add', model, @, options for model in existings
+      
     # **private**
     # Callback invoked when a database update is received.
     # Update the model from the current collection if needed, and fire event 'update'.
@@ -57,7 +55,7 @@ define [
       # manages transition changes
       if 'transition' of changes
         model = @get changes._id
-        model._transition = changes.transition if model?
+        model?._transition = changes.transition
 
       # Call inherited merhod
       super className, changes
@@ -65,7 +63,7 @@ define [
       # reset transition change detection when updated
       if 'transition' of changes
         model = @get changes._id
-        model._transitionChanged = false
+        model?._transitionChanged = false
 
   # Modelisation of a single Item.
   # Not wired to the server : use collections Items instead
@@ -101,31 +99,33 @@ define [
     # @param attributes [Object] raw attributes of the created instance.
     constructor: (attributes) ->
       super attributes
+      @_transition = null
       @_transitionChanged = false
       # Construct a Map around the raw map.
       if attributes?.map?
         # to avoid circular dependencies
         Map = require 'model/Map'
-        if typeof attributes.map is 'string'
-          # gets by id
-          map = Map.collection.get attributes.map
-          unless map
-            # trick: do not retrieve map, and just construct with empty name.
-            @set 'map', new Map _id: attributes.map
-          else 
-            @set 'map', map
-        else
-          # or construct directly
-          map = new Map attributes.map
-          Map.collection.add map
-          @set 'map', map
+        id = if 'string' is utils.type attributes.map then attributes.map else attributes.map._id
+        # gets by id
+        map = Map.collection.get id
+        unless map?
+          # construct it directly because it does not exist
+          if 'string' is utils.type attributes.map
+            # do not add it: just temporary
+            @map = new Map _id: id 
+          else
+            @map = new Map attributes.map
+            Map.collection.add @map
+        else 
+          @map = map
 
     # Overrides inherited setter to handle i18n fields.
     #
     # @param attr [String] the modified attribute
     # @param value [Object] the new attribute value
-    set: (attr, value) =>
-      super attr, value
+    # @param options [Object] optionnal set options
+    set: (attr, value, options) =>
+      super attr, value, options
       @_transitionChanged = true if attr is 'transition'
 
     # **private** 
@@ -134,7 +134,7 @@ define [
     #
     # @return a serialized version of this model
     _serialize: => 
-      result = @toJSON()
+      result = super()
       delete result.transition unless @_transitionChanged
       result
 

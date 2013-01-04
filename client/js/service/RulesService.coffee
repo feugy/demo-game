@@ -1,9 +1,12 @@
-'use strict'
-
 define [
   'utils/common'
   'utils/sockets'
-], (utils, sockets) ->
+  'model/Field'
+  # enforce that models are loaded
+  'model/Event'
+  'model/Player'
+  'model/Item'
+], (utils, sockets, Field) ->
 
   # Local cache of client rules.
   cachedRules= []
@@ -117,7 +120,7 @@ define [
         else if args.length is 3
           @_resolveArgs.x= args[1]
           @_resolveArgs.y= args[2]
-          filter = (entity) => entity.get('x') is @_resolveArgs.x and entity.get('y') is @_resolveArgs.y
+          filter = (entity) => entity.x is @_resolveArgs.x and entity.y is @_resolveArgs.y
           targets = targets.concat Item.collection.filter filter
           targets = targets.concat Field.collection.filter filter
           console.log "locally resolve rules for #{@_resolveArgs.actorId} at #{@_resolveArgs.x}:#{@_resolveArgs.y}"
@@ -182,18 +185,18 @@ define [
         @_onResolveRules null, results unless remainingTargets > 0
 
       for target in targets
-        # keep the target id in results
-        results[target.id] = []
         
         # function applied to filter rules that apply to the current target.
         filterRule = (rule, end) ->
+          
           try
             rule.canExecute actor, target, (err, params) ->
               # exit at the first resolution error
               return end "Failed to resolve rule #{rule.name}: #{err}" if err?
               if Array.isArray parameters
-                results[target._id].push 
-                  name: rule.name
+                results[rule.name] = [] unless rule.name of results
+                results[rule.name].push 
+                  target: target
                   category: rule.category
                   params: parameters
               end() 
@@ -240,6 +243,23 @@ define [
         if err?
           @_resolveArgs = null
           return console.error "Fail to resolve rules: #{err}" 
+        # enrich targets with Bacbone models
+        for rule, targets of results
+          for appliance in targets
+            # for players, items and events
+            if appliance.target._className?
+              modelClass = require "model/#{appliance.target._className}"
+              # get the existing model from the collection
+              model = modelClass.collection.get appliance.target[modelClass::idAttribute]
+              unless model?
+                # not existing ? adds it
+                model = new modelClass appliance.target
+                modelClass.collection.add model
+            else
+              # it's a field
+              model = new Field appliance.target
+            appliance.target = model
+        
         console.log "rules resolution ended for #{if @_resolveArgs.actorId? then 'actor '+@_resolveArgs.actorId else 'player '+@_resolveArgs.playerId}"
         app.router.trigger 'rulesResolved', @_resolveArgs, results
         # reset to allow further calls.

@@ -8,7 +8,12 @@ define [
   # internal state
   isLoggingOut = false
   app.connected = false
-  
+
+  # Needed on firefox to avoid errors when refreshing the page
+  $(window).on 'beforeunload', () ->
+    isLoggingOut = true
+    undefined
+    
   exports =
     
     # socket.io namespace for incoming updates
@@ -34,14 +39,15 @@ define [
         localStorage.removeItem storageKey
         isLoggingOut = true
         socket.emit 'logout'
-  
-      socket = io.connect conf.apiBaseUrl, {secure: true, query:"token=#{token}"}
+        app.router.navigate 'login', trigger: true
+      
+      socket = io.connect conf.apiBaseUrl+'/', {query:"token=#{token}"}
           
       socket.on 'error', (err) ->
         if connecting or app.connected
           app.connected = false
           connecting = false
-          errorCallback err 
+          errorCallback err
   
       socket.on 'disconnect', (reason) ->
         connecting = false

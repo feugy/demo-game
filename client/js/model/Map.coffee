@@ -1,5 +1,3 @@
-'use strict'
-
 define [
   'model/BaseModel'
   'model/Field'
@@ -29,6 +27,10 @@ define [
     # **private**
     # List of model attributes that are localized.
     _i18nAttributes: ['name']
+
+    # **private**
+    # List of properties that must be defined in this instance.
+    _fixedAttributes: ['kind']
 
     # **private**
     # flag to avoid multiple concurrent server call.

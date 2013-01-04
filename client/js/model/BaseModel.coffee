@@ -1,5 +1,3 @@
-'use strict'
-
 define [
   'backbone'
   'underscore'
@@ -27,14 +25,19 @@ define [
     # @param model [Object] the managed model
     # @param options [Object] unused
     constructor: (@model, @options) ->
-      super options
+      super [], options
 
       utils.onWired =>
         # bind updates
         sockets.updates.on 'creation', @_onAdd
         sockets.updates.on 'update', @_onUpdate
         sockets.updates.on 'deletion', @_onRemove
-
+        sockets.game.on 'getTypes-resp', (err, types) =>
+          # ignore errors
+          unless err?
+            # add returned models of the current class
+            @_onAdd type._className, type for type in types 
+      
     # **private**
     # Callback invoked when a database creation is received.
     # Adds the model to the current collection if needed, and fire event 'add'.
@@ -46,7 +49,7 @@ define [
       # add the created raw model. An event will be triggered
       @add model
       # propagates changes on collection to global change event
-      app.router.trigger 'modelChanged'
+      app.router.trigger 'modelChanged', 'add',  @get model[@model.prototype.idAttribute]
 
     # **private**
     # Callback invoked when a database update is received.
@@ -59,14 +62,21 @@ define [
       # first, get the cached item type and quit if not found
       model = @get changes[@model.prototype.idAttribute]
       return unless model?
-      # then, update the local cache.
-      model.set key, value for key, value of changes unless key in @_notUpdated
-
+      # console.log "process update for model #{model.id} (#{model._className})", changes
+      # then, update the local cache, using setter do defines dynamic properties if needed
+      modified = false
+      for key, value of changes
+        unless key in @_notUpdated
+          modified = true
+          model.set key, value 
+          # console.log "update property #{key}"
+      return unless modified
+      
       # emit a change.
       @trigger 'update', model, @, changes
       model.trigger 'update', model, changes
       # propagates changes on collection to global change event
-      app.router.trigger 'modelChanged'
+      app.router.trigger 'modelChanged', 'update', model
 
     # **private**
     # Callback invoked when a database deletion is received.
@@ -78,9 +88,13 @@ define [
     _onRemove: (className, model, options = {}) =>
       return unless className is @_className
       # removes the deleted item after enrich it to allow recognition. An event will be triggered
-      @remove new @model(model), options
-      # propagates changes on collection to global change event
-      app.router.trigger 'modelChanged'
+      removed = @get model[@model.prototype.idAttribute]
+      # removes the deleted item
+      if removed
+        @remove removed 
+        removed.trigger 'destroy', removed, @, options
+        # propagates changes on collection to global change event
+        app.router.trigger 'modelChanged', 'remove', removed
 
   # BaseLinkedCollection provides common behaviour for model wih linked objects collections.
   #
@@ -99,6 +113,22 @@ define [
       require @model.linkedCandidateClassesScript
 
     # **private**
+    # Callback invoked when a database creation is received.
+    # Adds the model to the current collection if needed, and fire event 'add'.
+    #
+    # @param className [String] the modified object className
+    # @param model [Object] created model.
+    _onAdd: (className, model) =>
+      return unless className is @_className
+      # before adding the model, wait for its type to be fetched
+      model = @_prepareModel model
+      model.on 'typeFetched', =>
+        # add the created raw model. An event will be triggered
+        @add model
+        # propagates changes on collection to global change event
+        app.router.trigger 'modelChanged', 'add', model
+        
+    # **private**
     # Callback invoked when a database update is received.
     # Update the model from the current collection if needed, and fire event 'update'.
     # Extension to resolve type when needed
@@ -109,7 +139,7 @@ define [
       return unless className is @_className
       # always keep an up-to-date type
       model = @get changes[@model.prototype.idAttribute]
-      model?.set 'type', @constructor.typeClass.collection.get model.get('type')?.id
+      model?.type = @constructor.typeClass.collection.get model.type?.id
 
       # Call inherited merhod
       super className, changes
@@ -136,10 +166,33 @@ define [
     _className: null
 
     # **private**
+    # List of properties that must be defined in this instance.
+    # **May be defined by subclasses**
+    _fixedAttributes: []
+
+    # **private**
     # List of model attributes that are localized.
     # **May be defined by subclasses**
     _i18nAttributes: []
 
+    # Initialization logic: declare dynamic properties for each of model's attributes
+    initialize: =>    
+      names = _.keys @attributes
+      # define property on attributes that must be present
+      names = _.uniq names.concat @_fixedAttributes, @_i18nAttributes
+      for name in names
+        # take in account i18n properties
+        publicName = name.replace /^_/, ''
+        name = publicName if publicName in @_i18nAttributes
+        ((name) =>
+          unless Object.getOwnPropertyDescriptor(@, name)?
+            Object.defineProperty @, name,
+              enumerable: true
+              configurable: true
+              get: -> @get name
+              set: (v) -> @set name, v
+        )(name)
+        
     # Overrides inherited getter to handle i18n fields.
     #
     # @param attr [String] the retrieved attribute
@@ -153,14 +206,49 @@ define [
     #
     # @param attr [String] the modified attribute
     # @param value [Object] the new attribute value
-    set: (attr, value) =>
-      if attr in @_i18nAttributes
-        attr = "_#{attr}"
-        val = @attributes[attr]
-        val ||= {}
-        val[@locale] = value
-        value = val
-      super attr, value
+    # @param options [Object] optionnal set options
+    set: (attr, value, options) =>
+      # treat single attribute
+      single = (name) =>
+        if name in @_i18nAttributes
+          # manage i18n property
+          _name = "_#{name}"
+          val = @attributes[_name]
+          val ||= {}
+          val[@locale] = attr[name]
+          delete attr[name]
+          attr[_name] = val
+        else
+          # define property if needed
+          unless Object.getOwnPropertyDescriptor(@, name)?
+            Object.defineProperty @, name,
+              enumerable: true
+              configurable: true
+              get: -> @get name
+              set: (v) -> @set name, v
+
+      # Always works in 'object mode'
+      unless 'object' is utils.type attr
+        obj = {}
+        obj[attr] = value
+        attr = obj
+      else 
+        options = value
+    
+      single attrName for attrName of attr
+
+      # supperclass processing
+      super attr, options
+      
+    # Provide a custom sync method to wire model to the server.
+    # Only read operation of single model is supported.
+    #
+    # @param method [String] the CRUD method ("create", "read", "update", or "delete")
+    # @param collection [Items] the current collection
+    # @param args [Object] arguments
+    sync: (method, collection, args) =>
+      throw new Error "Unsupported #{method} operation on #{@_className}" unless method is 'read'
+      sockets.game.emit 'getTypes', [@[@idAttribute]]
 
     # **private** 
     # Method used to serialize a model when saving and removing it
@@ -189,7 +277,6 @@ define [
     # Array of path of classes in which linked objects are searched.
     # **Must be defined by subclasses**
     @linkedCandidateClasses: []
-
     # LinkedModel constructor.
     # Will fetch type from server if necessary, and trigger the `typeFetched` when finished.
     #
@@ -201,37 +288,71 @@ define [
       # Construct an type around the raw type.
       if attributes?.type?
         typeId = attributes.type
-        if typeof attributes.type is 'object'
+        if 'object' is utils.type attributes.type
           typeId = attributes.type[@idAttribute]
 
         # resolve by id
         type = @constructor.typeClass.collection.get typeId
         # not found on client
         unless type?
-          if typeof attributes.type is 'object'
+          if 'object' is utils.type attributes.type
             # we have all informations: just adds it to collection
             type = new @constructor.typeClass attributes.type
             @constructor.typeClass.collection.add type
-            @set 'type', type
-            @trigger 'typFetched', @
+            @type = type
+            _.defer => @trigger 'typeFetched', @
           else
             # get it from server
             @constructor.typeClass.collection.on 'add', @_onTypeFetched
-            @constructor.typeClass.collection.fetch attributes.type
+            type = {}
+            type[@idAttribute] = typeId
+            new @constructor.typeClass(type).fetch()
         else 
-          @set 'type', type
-          @trigger 'typFetched', @
+          @type = type
+          _.defer => @trigger 'typeFetched', @
+      
+      # update if one of linked model is removed
+      app.router.on 'modelChanged', (kind, model) => 
+        return unless kind is 'remove' and !@equals model
+
+        properties = @type.properties
+        return unless properties?
+        changes = {}
+        # process each properties
+        for prop, def of properties
+          value = @[prop]
+          if def.type is 'object' and model.equals value
+            @[prop] = null
+            changes[prop] = null
+          else if def.type is 'array' 
+            value = [] unless value?
+            modified = false
+            value = _.filter value, (linked) -> 
+              if model.equals linked
+                modified = true
+                false
+              else
+                true
+            if modified
+              @[prop] = value
+              changes[prop] = value
+
+        # indicate that model changed
+        unless 0 is _.keys(changes).length
+          console.log "update model #{@id} after removing a linked object #{model.id}"
+          @trigger 'update', @, changes
 
     # Handler of type retrieval. Updates the current type with last values
     #
     # @param type [Type] an added type.      
     _onTypeFetched: (type) =>
-      if type.id is @get 'type'
+      if type.id is @type
+        console.log "type #{type.id} successfully fetched from server for #{@_className.toLowerCase()} #{@id}"
         # remove handler
         @constructor.typeClass.collection.off 'add', @_onTypeFetched
         # update the type object
-        @set 'type', type
-        @trigger 'typFetched', @
+        @type = type
+        @trigger 'typeFetched', @
 
     # This method retrieves linked Event in properties.
     # All `object` and `array` properties are resolved. 
@@ -243,11 +364,13 @@ define [
     getLinked: (callback) =>
       needResolution = false
       # identify each linked properties 
+      console.log "search linked ids in #{@_className.toLowerCase()} #{@id}"
       # gets the corresponding properties definitions
-      properties = @get('type').get 'properties'
+      properties = @type.properties
+      return callback null, @ unless properties?
       for prop, def of properties
-        value = @get prop
-        if def.type is 'object' and typeof value is 'string'
+        value = @[prop]
+        if def.type is 'object' and 'string' is utils.type value
           # try to get it locally first in same class and in other candidate classes
           objValue = @constructor.collection.get value
           unless objValue?
@@ -255,14 +378,14 @@ define [
               objValue = require(candidateScript).collection.get value
               break if objValue?
           if objValue?
-            @set prop, objValue
+            @[prop] = objValue
           else
             # linked not found: ask to server
             needResolution = true
             break
         else if def.type is 'array' 
           value = [] unless value?
-          for linked, i in value when typeof linked is 'string'
+          for linked, i in value when 'string' is utils.type linked
             # try to get it locally first in same class and in other candidate classes
             objLinked = @constructor.collection.get linked
             unless objLinked?
@@ -280,45 +403,53 @@ define [
       # exit immediately if no resolution needed  
       unless needResolution
         return _.defer => 
+          console.log "linked ids for #{@_className.toLowerCase()} #{@id} resolved from cache"
           callback null, @ 
-
-      # now that we have the linked ids, get the corresponding instances.
-      sockets.game.once "get#{@_className}s-resp", (err, instances) =>
+      
+      # process response
+      process = (err, instances) =>
         return callback "Unable to resolve linked on #{@id}. Error while retrieving linked: #{err}" if err?
+        # only for our own request
+        return unless instances.length is 1 and instances[0][@idAttribute] is @[@idAttribute]
+        sockets.game.removeListener "get#{@_className}s-resp", process
+        
         instance = instances[0]
 
         # update each properties
-        properties = @get('type').get 'properties'
+        properties = @type.properties
         for prop, def of properties
           value = instance[prop]
           if def.type is 'object'
-            if value isnt null
+            if value?
               # construct a backbone model around linked object
               clazz = @constructor
-              for candidateScript in @constructor.linkedCandidateClasses when candidateScript is "model/#{value.className}"
+              for candidateScript in @constructor.linkedCandidateClasses when candidateScript is "model/#{value._className}"
                 clazz = require(candidateScript)
               obj = new clazz value
               clazz.collection.add obj
             else
               obj = null
             # update current object
-            @set prop, obj
+            @[prop] = obj
           else if def.type is 'array' 
             value = [] unless value?
-            for val, i in value
+            @[prop] = []
+            for val in value when val?
               # construct a backbone model around linked object
               clazz = @constructor
-              for candidateScript in @constructor.linkedCandidateClasses when candidateScript is "model/#{val.className}"
+              for candidateScript in @constructor.linkedCandidateClasses when candidateScript is "model/#{val._className}"
                 clazz = require(candidateScript)
               obj = new clazz val
               clazz.collection.add obj
               # update current object
-              @get(prop)[i] = obj
+              @[prop].push obj
 
         # end of resolution.
         console.log "linked ids for #{@_className.toLowerCase()} #{@id} resolved"
         callback null, @
-
+        
+      # now that we have the linked ids, get the corresponding instances.
+      sockets.game.on "get#{@_className}s-resp", process
       sockets.game.emit "get#{@_className}s", [@id]
 
     # **private** 
@@ -327,13 +458,12 @@ define [
     #
     # @return a serialized version of this model
     _serialize: => 
-      properties = @get('type').get 'properties'
+      properties = @type.properties
       attrs = {}
       for name, value of @attributes
-        if properties[name]?.type is 'object'
+        if properties?[name]?.type is 'object'
           attrs[name] = if 'object' is utils.type value then value?.id else value
-        else if properties[name]?.type is 'array'
-          linked = []
+        else if properties?[name]?.type is 'array'
           attrs[name] = ((if 'object' is utils.type obj then obj?.id else obj) for obj in value)
         else
           attrs[name] = value

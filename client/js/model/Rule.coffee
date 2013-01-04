@@ -1,5 +1,3 @@
-'use strict'
-
 define [], ->
 
   # Game rules on client side only contains the `canExecute()` part:

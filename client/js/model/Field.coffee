@@ -1,11 +1,10 @@
-'use strict'
-
 define [
   'underscore'
   'backbone'
+  'model/FieldType'
   'utils/common'
   'utils/sockets'
-], (_, Backbone, utils, sockets) ->
+], (_, Backbone, FieldType, utils, sockets) ->
 
   # Field collection to handle multiple operaions on fields.
   # Do not provide any local cache, nor allows field retrival. Use `Map.consult()` method instead.
@@ -17,7 +16,7 @@ define [
     # @param model [Object] the managed model
     # @param options [Object] unused
     constructor: (@model, @options) ->
-      super options
+      super [], options
       # bind updates
       utils.onWired =>
         sockets.updates.on 'creation', @_onAdd
@@ -33,13 +32,18 @@ define [
       # calls the inherited method
       super models, options
       models = if _.isArray models then models.slice() else [models]
+      typeIds = []
       for model in models
         @_removeReference @_byId[model._id]
+        typeIds.push model.typeId unless model.typeId in typeIds
       # deletes local caching
       @models = []
       @_byCid = {}
       @_byId = {}
       length = 0
+      # load types if needed
+      typeIds = _.reject typeIds, (id) -> FieldType.collection.get(id)?
+      sockets.game.emit 'getTypes', typeIds if typeIds.length isnt 0
       return @
 
     # Override the inherited method to trigger remove events.
@@ -81,6 +85,19 @@ define [
     # bind the Backbone attribute and the MongoDB attribute
     idAttribute: '_id'
 
+    # Initialization logic: declare dynamic properties for each of model's attributes
+    initialize: =>
+      names = _.keys @attributes
+      for name in names
+        ((name) =>
+          unless Object.getOwnPropertyDescriptor(@, name)?
+            Object.defineProperty @, name,
+              enumerable: true
+              configurable: true
+              get: -> @get name
+              set: (v) -> @set name, v
+        )(name)
+        
     # An equality method that tests ids.
     #
     # @param other [Object] the object against which the current item is tested

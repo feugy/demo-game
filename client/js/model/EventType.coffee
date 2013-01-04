@@ -1,5 +1,3 @@
-'use strict'
-
 define [
   'model/BaseModel'
 ], (Base) ->
@@ -24,4 +22,8 @@ define [
 
     # **private**
     # List of model attributes that are localized.
-    _i18nAttributes: ['name', 'desc']
+    _i18nAttributes: ['name', 'desc', 'template']
+    
+    # **private**
+    # List of properties that must be defined in this instance.
+    _fixedAttributes: ['descImage', 'properties']

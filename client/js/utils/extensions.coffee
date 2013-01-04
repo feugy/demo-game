@@ -1,5 +1,3 @@
-'use strict'
-
 define [
   'underscore'
   'underscore.string'
@@ -29,19 +27,20 @@ define [
     initialize: ->
       # initialize to avoid static behaviour
       @_bounds = []
+      # auto dispose when removing
+      @$el.on 'remove', @dispose
 
     # Allows to bound a callback of this view to the specified emitter
     # bounds are keept and automatically unbound by the `destroy` method.
     #
     # @param emitter [Backbone.Event] the emitter on which callback is bound
-    # @param events [String] events on which the callback is bound
+    # @param events [String] events on which the callback is bound (space delimitted)
     # @parma callback [Function] the bound callback
     bindTo: (emitter, events, callback) ->
-      emitter.on events, callback
-      @_bounds.push [emitter, events, callback]
-      # auto dispose when removing
-      @$el.on 'destroyed', =>
-        @dispose()
+      evts = events.split ' '
+      for evt in evts
+        emitter.on evt, callback
+        @_bounds.push [emitter, evt, callback]
       
     # Unbounds a callback of this view from the specified emitter
     #
@@ -56,13 +55,14 @@ define [
     # The destroy method correctly free DOM  and event handlers
     # It must be overloaded by subclasses to unsubsribe events.
     dispose: ->
-      console.log 'coucou dispose'
       # automatically remove bound callback
       spec[0].off spec[1], spec[2] for spec in @_bounds
       # unbind DOM callback
       @$el.unbind()
       # superclass behaviour
       Backbone.View.prototype.dispose.apply @, arguments
+      # trigger dispose event
+      @trigger 'dispose', @
 
     # The `render()` method is invoked by backbone to display view content at screen.
     # if a template is defined, use it

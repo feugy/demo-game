@@ -1,5 +1,357 @@
-@import 'jquery-ui-1.9.1-min.css'
-@import 'reset'
-@import 'mixins'
 @import 'constants'
+@import 'bootstrap-2.2.1-min.css'
+@import 'bootstrap-responsive-2.2.1-min.css'
+@import 'mixins'
 @import 'widget'
+
+/***********************************************
+ * Layout
+ */
+
+html 
+  height 100%
+
+body
+  height 100%
+  width 100%
+  background-color pageColor
+  position relative
+
+#main:not(.fullscreen)
+  box-orient horizontal
+  box-align center
+  box-pack center
+  display box
+  height 100%
+  width 100%
+
+#main.fullscreen
+  position absolute
+  top 0
+  bottom 0
+  left 0
+  right 0
+  overflow hidden
+  min-height 600px
+  min-width 800px
+  
+.view
+  display inline-block
+
+/***********************************************
+ * Skin
+ */
+
+.frame
+.popover-inner
+.modal
+.dropdown-menu
+  border 13px solid transparent
+  border-radius 5px
+  border-image-source url('../img/frame.png')
+  border-image-slice 53
+  border-image-width 5
+  border-image-outset 1px
+  background-color bgColor
+  background-clip border-box
+  padding 1.5em
+  box-shadow 0 0 10px -1px shadowColor
+
+.dropdown-menu
+  border-width 5px 
+  padding 5px 0
+
+.frame.buttons
+  border-image-source url('../img/buttons-frame.png')
+  border-image-slice 53 53 60 53
+  border-image-width 5 5 8 5
+  border-bottom-width 17px
+  padding-bottom 0
+  
+.frame.title
+.popover-inner
+.modal
+  border-image-source url('../img/title-frame.png')
+  border-image-slice 60 53 53 53
+  border-top-width 17px
+  padding-top 0
+
+  > *:first-child
+    margin-top -5px
+    text-align center
+  
+  > h1:first-child
+    margin-top 0
+
+.popover-inner
+  border-image-slice 51 53 53 53
+  border-top-width 10px
+  min-width 350px
+
+.modal-header
+.popover-title
+  margin-top -2px
+  background transparent
+  border none
+
+.modal-footer
+  padding 0
+  box-shadow none
+
+.modal-body
+.popover-content
+  padding 1em 0 0
+  margin 0
+
+.popover
+.modal-footer
+  border none
+  background transparent
+
+h1, h2, h3, h4, h5, h6, li, span, p, div, a, label, input, select, textarea
+  color fontColor
+  font-size fontSize
+  font-family fontFamily
+
+for i  in 1..6
+  h{i}
+    color titleColor
+    font-size fontSize*(1+0.1*(7 - i))
+    font-weight bold
+    text-shadow 0 0 5px fontShadow
+
+input[type], select, textarea
+  border 2px solid bgColor
+  color titleColor
+
+input[type]:focus, select:focus, textarea:focus
+  border 2px solid bgColor
+  box-shadow 0 1px 1px fontShadow inset, 0 0 8px fontShadow
+
+textarea
+  height 4em
+  width 100%
+  box-sizing border-box
+  resize none
+
+.btn
+.btn.btn-primary
+  border 3px solid transparent
+  border-radius 5px
+  border-image-source url('../img/button.png')
+  border-image-slice 18
+  border-image-width 8
+  border-image-outset 2px
+  background none
+  color fontColor
+  text-shadow none
+
+.close
+  color titleColor
+  opacity 0.5
+  font-size 24px
+
+.modal-header .close
+.close
+  margin -5px -30px 0 0
+
+.btn:hover
+.btn.btn-primary:hover
+  color titleColor
+  text-shadow 0 0 5px fontShadow
+  box-shadow 0 0 10px -1px shadowColor
+
+.close:hover
+  opacity 1
+  color titleColor
+  text-shadow 0 0 5px fontShadow
+
+.dropdown-menu
+  background bgColor
+
+.dropdown-menu li > a:hover
+.dropdown-menu li > a:focus
+.dropdown-submenu:hover > a
+  background transparent
+  color titleColor
+  text-shadow 0 0 5px fontShadow
+
+.pull-center
+  text-align center
+
+/***********************************************
+ * Login view
+ */
+
+.login.view
+
+  .container
+    width 450px
+    text-align center
+
+  .providers label
+  .separator
+    padding 1em 0
+
+  .control-group
+    margin-bottom 1em
+
+  .form-horizontal
+    margin-bottom -1em
+
+  .connect:before
+    background-image url('../img/providers.png')
+    background-repeat no-repeat
+    display inline-block
+    width 25px 
+    height 24px
+    content ''    
+    margin 0 0.5em 0 -5px
+    vertical-align -0.5em
+
+  .twitter
+    margin-left 2em
+    &:before
+      background-position 0px -24px
+
+/***********************************************
+ * Enrollement view
+ */
+
+.enroll.view
+
+  .frame
+    width 450px
+
+    > h1
+      margin-bottom 1em
+  
+/***********************************************
+ * Word view
+ */
+
+.world.view
+  width 100%
+  height 100%
+
+  .map-widget
+    margin 0
+    transform-origin 0 0
+
+  .commands
+    position absolute
+    right 0
+    bottom 0
+    display block
+    width 272px
+    height 105px
+    background-image url('../img/ui-2-inner.png')
+    background-repeat no-repeat
+    background-size contain
+
+    > *
+      position absolute
+  
+    .logout    
+      right 35px
+      bottom 36px
+      line-height 12px
+
+    .name
+      bottom 37px
+      left 51px
+      width 104px
+      overflow hidden
+      font-size fontSize*1.1
+      text-overflow ellipsis
+      text-shadow -2px 2px 0 pageColor
+      text-align center
+
+    .energy
+      bottom 7px
+      right 41px
+      
+      label
+        display inline-block
+        margin 0 7px 0 0
+
+      > .value    
+        display inline-block
+        height 17px
+        width 63px
+        vertical-align bottom
+        border 2px solid darken(bgColor, 40%)
+        background-color pageColor
+        border-radius 4px
+        text-align right
+
+    .outer
+      top 0
+      left 0
+      width 100%
+      height 100%
+      background-image url('../img/ui-2.png')
+      background-repeat no-repeat
+      background-size contain
+      pointer-events none
+
+  .events 
+    position absolute
+    left 80px
+    bottom 0
+
+    .base
+      background-image url('../img/ui-1.png')
+      background-repeat no-repeat
+      background-size contain
+      display block
+      height 90px
+      width 276px
+      margin-left -80px
+
+    .list
+      halo = rgba(fontShadow, 0.3)
+      background-color halo
+      border-radius 2px
+      box-shadow 0 -2px 8px 8px halo
+      display inline-block
+      margin-bottom 15px
+  
+      &.empty
+        display none
+
+      &:after
+        opacity 0.1
+        content: ''
+        display block
+        border-style solid 
+        border-color fontShadow transparent
+        border-width 35px 40px 0
+        position absolute
+        margin 1px 0 0 10px
+
+      .event-widget
+        cursor pointer
+        width 100px
+        height 100px
+        margin 1em 0
+
+        .text-content
+          max-height 8em
+          overflow-y auto
+
+        .actions
+          text-align right
+          
+          > *:not(:first-child)
+            margin-left 1em
+
+          textarea
+            margin-top 1em
+
+  .rule-menu
+    position absolute
+    
+    a
+      color fontColor
+      font-size fontSize

@@ -1,11 +1,50 @@
-'use strict'
-
 define [
+  'underscore'
   'utils/common'
   'model/BaseModel'
   'model/EventType'
-], (utils, Base, EventType) ->
+  'utils/sockets'
+], (_, utils, Base, EventType, sockets) ->
 
+  # Enrich event from with Backbone Model. 
+  # May ask to server the missing from item.
+  # Use a callback or trigger update on enriched model.
+  #
+  # @param model [Event] enriched model
+  # @param callback [Function] end enrichment callback. Default to null.
+  enrichFrom = (model, callback) ->
+    callback = if 'function' is utils.type callback then callback else () -> true
+    raw = model.from
+    id = if 'object' is utils.type raw then raw._id else raw
+    require ['model/Item'], (Item) => 
+      model.from = Item.collection.get id
+      return callback() if model.from?
+      if 'object' is utils.type raw
+        model.from = new Item raw
+        Item.collection.add model.from
+        callback()
+      else
+        # load missing from
+        processFrom = (err, froms) =>
+          return callback() if err?
+          raw = _.find(froms, (from) -> from._id is id)
+          return callback() unless raw?
+          sockets.game.removeListener 'getItems-resp', processFrom
+
+          existing = Item.collection.get raw._id
+          if existing?
+            model.from = existing
+            # reuse existing but merge its values
+            Item.collection.add raw
+          else
+            # immediately add enriched from
+            model.from = new Item raw
+            Item.collection.add model.from
+          callback()
+
+        sockets.game.on 'getItems-resp', processFrom
+        sockets.game.emit 'getItems', [id]
+      
   # Client cache of events.
   class _Events extends Base.LinkedCollection
 
@@ -18,7 +57,7 @@ define [
 
     # **private**
     # List of not upadated attributes
-    _notUpdated: ['_id', 'type', 'from']
+    _notUpdated: ['_id', 'type']
 
     # **private**
     # Callback invoked when a database creation is received.
@@ -31,11 +70,11 @@ define [
       
       # resolves from object if possible
       if 'from' of model and model.from?
-        id = if 'object' is utils.type model.from then model.from._id else model.from
-        model.from = require('model/Item').collection.get id
-
-      # calls inherited merhod
-      super className, model
+        # calls inherited merhod
+        enrichFrom model, => super className, model
+      else
+        # calls inherited merhod
+        super className, model
 
     # **private**
     # Callback invoked when a database update is received.
@@ -49,11 +88,11 @@ define [
 
       # resolves from object if possible
       if 'from' of changes and changes.from?
-        id = if 'object' is utils.type changes.from then changes.from._id else changes.from
-        changes.from = require('model/Item').collection.get id
-      
-      # calls inherited merhod
-      super className, changes
+        # calls inherited merhod
+        enrichFrom changes, => super className, changes
+      else
+        # calls inherited merhod
+        super className, changes
 
   # Modelisation of a single Event.
   # Not wired to the server : use collections Events instead
@@ -72,3 +111,34 @@ define [
     # **private**
     # Class name of the managed model, for wiring to server and debugging purposes
     _className: 'Event'
+
+    # **private**
+    # List of properties that must be defined in this instance.
+    _fixedAttributes: ['created', 'updated', 'from', 'type']
+
+    # Event constructor.
+    # Enriched from object with Item model. 
+    #
+    # @param attributes [Object] raw attributes of the created instance.
+    # @param c
+    constructor: (attributes) ->
+      super attributes
+      if @from?
+       enrichFrom @, => @trigger 'update', @, from: @from
+
+      # update if from item was removed
+      app.router.on 'modelChanged', (kind, model) => 
+        if kind is 'remove' and @from?.equals model
+          console.log "update event #{@id} after removing its from #{model.id}"
+          @from = null
+          @trigger 'update', @, from: null
+          
+    # **private** 
+    # Method used to serialize a model when saving and removing it
+    # Extend inherited method to avoid sending from item, to avoid recursion, before returning JSON representation 
+    #
+    # @return a serialized version of this model
+    _serialize: => 
+      attrs = super()
+      attrs.from = attrs.from?.id
+      attrs

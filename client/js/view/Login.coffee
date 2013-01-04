@@ -1,5 +1,3 @@
-'use strict'
-
 define [
   'jquery'
   'backbone'
@@ -25,34 +23,35 @@ define [
     #
     # @param form [Object] login form already present inside DOM to attach inside template
     constructor: (@_form) ->
-      super tagName: 'div', className:'login-view'
+      super tagName: 'div', className:'login view'
 
     # the render method, which use the specified template
     render: =>
       super()
-      @$el.find('.loader').hide()
+      @$('.loader').hide()
 
       # replace form inside view
-      @$el.find('.form-placeholder').replaceWith @_form
-      @_form.find('input').wrap('<fieldset></fieldset>')
-      @_form.find('[name="username"]').before "<label>#{i18n.labels.enterLogin}</label>"
-      @_form.find('[name="password"]').before "<label>#{i18n.labels.enterPassword}</label>"
+      @$('.form-placeholder').replaceWith @_form
+      @_form.find('form').addClass 'form-horizontal'
+      @_form.find('[name]').wrap('<fieldset class="control-group"></fieldset>')
+      @_form.find('[name="username"]').before "<label class='control-label'>#{i18n.labels.enterLogin}</label>"
+      @_form.find('[name="password"]').before "<label class='control-label'>#{i18n.labels.enterPassword}</label>"
       @_form.show()
 
       # wire connection buttons and form
-      @$el.find('.google').attr 'href', "#{conf.apiBaseUrl}/auth/google"
-      @$el.find('.twitter').attr 'href', "#{conf.apiBaseUrl}/auth/twitter"
-      @$el.find('#login-form').attr 'action', "#{conf.apiBaseUrl}/auth/login"
-      @$el.find('#login-form').on 'submit', =>
-        @$el.find('.loader').show()
+      @$('.google').attr 'href', "#{conf.apiBaseUrl}/auth/google"
+      @$('.twitter').attr 'href', "#{conf.apiBaseUrl}/auth/twitter"
+      @$('#login-form').attr 'action', "#{conf.apiBaseUrl}/auth/login"
+      @$('#login-form').on 'submit', =>
+        @$('.loader').show()
         # send back form into body
         @_form.hide().appendTo 'body'
 
-      @$el.find('.login').button(
-        label: i18n.buttons.login
+      @$('.login').html(
+        i18n.buttons.login
       ).click (event) => 
         event?.preventDefault()
-        @$el.find('#login-form').submit()
+        @$('#login-form').submit()
       
       # for chaining purposes
       @
