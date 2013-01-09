@@ -51,7 +51,8 @@ define [
   
       socket.on 'disconnect', (reason) ->
         connecting = false
-        app.connected = false 
+        app.connected = false
+        exports[name].removeAllListeners() for name of exports
         return if isLoggingOut
         errorCallback if reason is 'booted' then 'kicked' else 'disconnected'
   

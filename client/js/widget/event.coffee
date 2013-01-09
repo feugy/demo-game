@@ -37,7 +37,9 @@ define [
       super element, options
       @_shown = false
       @$el.addClass 'event-widget'
-
+  
+      console.log '<<<', @options.model
+      
       # bind to model events
       @bindTo @options.model, 'update', @_onUpdate
       @bindTo @options.model, 'destroy', => @$el.remove()

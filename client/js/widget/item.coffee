@@ -74,6 +74,11 @@ define [
       @$el.addClass 'item-widget'
       @_img = $('<div></div>').appendTo @$el
       
+      if app.player?.characters?
+        for character in app.player.characters when character.equals @options.model
+          @$el.addClass 'character'
+          break
+      
       @_sprite= null
       @_step= 0
       @_offset= x:0, y:0

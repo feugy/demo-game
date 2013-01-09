@@ -68,7 +68,6 @@ define [
         @_mapWidget?.addData unless Array.isArray added then [added] else added
       @bindTo Field.collection, 'remove', (removed) =>
         @_mapWidget?.removeData unless Array.isArray removed then [removed] else removed
-        
       @bindTo Item.collection, 'add update', (added) =>
         @_mapWidget?.addData unless Array.isArray added then [added] else added
       @bindTo Item.collection, 'remove', (removed) =>
