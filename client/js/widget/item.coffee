@@ -11,7 +11,7 @@ define [
   defaultWidth = 100;
 
   # List of executing animations
-  _anims = []
+  _anims = {}
 
   # The unic animation loop
   _loop = (time) ->
@@ -21,11 +21,11 @@ define [
       # if document is in background, animations will stop, so stop animations.
       time = null
     # trigger onFrame for each executing animations
-    for anim in _anims
+    for key, anim of _anims
       anim._onFrame.call anim, time if anim isnt undefined
 
   # starts the loop at begining of the game
-  _loop new Date().getTime()
+  window.requestAnimationFrame _loop 
   
   # Item widget is responsible for displaying a map item.
   # It automatically updates when bound item is updated or removed.
@@ -129,7 +129,7 @@ define [
         @_onFrame @_start+@_sprite.duration
       else
         # adds it to current animations
-        _anims.push @
+        _anims[@options.model.id] = @
       
     # **private**
     # Compute and apply the position of the current widget inside its map widget.
@@ -184,7 +184,7 @@ define [
               top: @_newPos.top-@_newPos.stepT*(@_sprite.number-@_step)
       else 
         # removes from executing animations first.
-        _anims.splice _anims.indexOf(@), 1
+        delete _anims[@options.model.id]
         # end of the animation: displays first sprite
         @_offset.x = 0
         @_img.css 'background-position': "#{@_offset.x}px #{@_offset.y}px"
@@ -212,8 +212,8 @@ define [
         width: @_imageSpec.width
         height: @_imageSpec.height
       if success 
-        # displays image data and hides alertnative text
-        @_img.css 'background-image', "url(#{utils.getImageString img})"
+        # displays image (as it was loading, browser cache will be used)
+        @_img.css 'background-image', "url(#{img})"
       # render again
       @_positionnate()
       @_render()
@@ -235,7 +235,6 @@ define [
         @_positionnate 'transition' of changes and changes.transition?
       # render new animation if needed
       if 'transition' of changes and changes.transition? and @options.map?
-        console.log "apply #{changes.transition} on #{@options.model._id}, (#{@options.model.x}/#{@options.model.y})"
         @_render()
       # refresh displayed image if needed
       if 'imageNum' of changes

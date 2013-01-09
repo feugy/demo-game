@@ -184,14 +184,14 @@ define [
         # take in account i18n properties
         publicName = name.replace /^_/, ''
         name = publicName if publicName in @_i18nAttributes
-        ((name) =>
-          unless Object.getOwnPropertyDescriptor(@, name)?
+        unless Object.getOwnPropertyDescriptor(@, name)?
+          ((name) =>
             Object.defineProperty @, name,
               enumerable: true
               configurable: true
               get: -> @get name
               set: (v) -> @set name, v
-        )(name)
+          )(name)
         
     # Overrides inherited getter to handle i18n fields.
     #
@@ -354,6 +354,36 @@ define [
         @type = type
         @trigger 'typeFetched', @
 
+    # Overrides inherited setter to handle type field.
+    #
+    # @param attr [String] the modified attribute
+    # @param value [Object] the new attribute value
+    # @param options [Object] optionnal set options
+    set: (attr, value, options) =>
+      # treat single attribute
+      declareProps = =>
+        # define property if needed
+        for name of @type.properties when !(Object.getOwnPropertyDescriptor(@, name)?)
+          ((name) => 
+            Object.defineProperty @, name,
+              enumerable: true
+              configurable: true
+              get: -> @get name
+              set: (v) -> @set name, v
+          )(name)
+
+      # Always works in 'object mode'
+      unless 'object' is utils.type attr
+        obj = {}
+        obj[attr] = value
+        attr = obj
+      else
+        options = value
+      # supperclass processing
+      super attr, options
+
+      declareProps() if attr?.type?
+      
     # This method retrieves linked Event in properties.
     # All `object` and `array` properties are resolved. 
     # Properties that aims at unexisting linked are reset to null.

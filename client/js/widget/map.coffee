@@ -26,10 +26,6 @@ define [
     _itemWidgets: {}
 
     # **private**
-    # stores widget to be destroy when refreshing displayed items
-    _oldWidgets: {}
-
-    # **private**
     # Jumper to avoid refreshing too many times hovered tile.
     _moveJumper: 0
 
@@ -79,7 +75,6 @@ define [
           @_cloneLayer = $("<canvas width=\"#{o.renderer.width*3}\" height=\"#{o.renderer.height*3}\"></canvas>")
           # empty datas
           @_fields = []
-          @_oldWidgets = _.clone @_itemWidgets
           @$el.trigger 'coordChanged'
         when 'mapId'
           if old isnt value
@@ -143,7 +138,7 @@ define [
           # for item of the displayed map
           @_loading++
           id = obj.id
-          @_oldWidgets[id] = @_itemWidgets[id] if id of @_itemWidgets and !(id of @_oldWidgets)
+          @_itemWidgets[id] = 'tmp'
           _.defer =>
             # creates widget for this item
             @_itemWidgets[id] = $('<div></div>').item(
@@ -151,6 +146,9 @@ define [
               map: @
             ).on('loaded', =>
               @_loading--
+              # remove previous widget
+              @_itemLayer.find("[data-id='#{id}']").remove()
+              @_itemWidgets[id].$el.attr 'data-id', id
               checkLoadingEnd()
             ).on('dispose', (event, widget) =>
               # when reloading, it's possible that widget have already be replaced
@@ -343,11 +341,13 @@ define [
     #
     # @param success [Boolean] true if image was successfully loaded
     # @param src [String] the loaded image url
-    # @param img [Image] an Image object, null in case of failure
-    _onImageLoaded: (success, src, img) => 
+    _onImageLoaded: (success, src) => 
       o = @options
       # do nothing if loading failed.
       return unless src in @_loadedImages
+      # looks for data corresponding to this image
+      img = app.imagesService.getImage src
+      
       @_loadedImages.splice @_loadedImages.indexOf(src), 1
       src = src.slice src.lastIndexOf('/')+1
       @_pendingImages--

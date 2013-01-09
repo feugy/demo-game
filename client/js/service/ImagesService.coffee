@@ -12,6 +12,10 @@ define [
     # **private**
     # Image local cache, that store Image objects
     _cache: {}
+        
+    # **private**
+    # Timestamps added to image request to server, avoiding cache
+    _timestamps: {}
     
     # Constructor. 
     constructor: ->
@@ -28,7 +32,7 @@ define [
       # Use cache if available, with a timeout to simulate asynchronous behaviour
       if image of @_cache
         _.defer =>
-          app.router.trigger 'imageLoaded', true, image, @_cache[image]
+          app.router.trigger 'imageLoaded', true, image, "#{image}?#{@_timestamps[image]}"
       else unless image in @_pendingImages
         @_pendingImages.push image
         # creates an image facility
@@ -36,10 +40,16 @@ define [
         # bind loading handlers
         $(imgData).load @_onImageLoaded
         $(imgData).error @_onImageFailed
+        @_timestamps[image] = new Date().getTime()
         # adds a timestamped value to avoid browser cache
-        imgData.src = "#{image}?#{new Date().getTime()}"
+        imgData.src = "#{image}?#{@_timestamps[image]}"
         isLoading = true
       isLoading
+
+    # Returns the image content from the cache, or null if the image was not requested yet
+    getImage: (image) =>
+      return null unless image of @_cache
+      @_cache[image]
 
     # **private**
     # Handler invoked when an image finisedh to load. Emit the `imageLoaded` event. 
@@ -51,13 +61,9 @@ define [
       return unless src?
       # Remove event from pending array
       @_pendingImages.splice @_pendingImages.indexOf(src), 1
-      # Gets the image data with a canvas temporary element
-      canvas = $("<canvas></canvas>")[0]
-      canvas.width = event.target.width
-      canvas.height = event.target.height
       # Store Image object and emit on the event bus
       @_cache[src] = event.target
-      app.router.trigger 'imageLoaded', true, src, event.target
+      app.router.trigger 'imageLoaded', true, src, "#{src}?#{@_timestamps[src]}"
   
     # **private**
     # Handler invoked when an image failed loading. Also emit the `imageLoaded` event.
