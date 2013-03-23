@@ -28,7 +28,7 @@ define [
       # initialize to avoid static behaviour
       @_bounds = []
       # auto dispose when removing
-      @$el.on 'remove', @dispose
+      @$el.on 'remove', => @dispose()
 
     # Allows to bound a callback of this view to the specified emitter
     # bounds are keept and automatically unbound by the `destroy` method.
